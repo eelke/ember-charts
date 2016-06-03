@@ -2,7 +2,7 @@ import Ember from 'ember';
 import ResizeHandlerMixin from '../mixins/resize-handler';
 import ColorableMixin from '../mixins/colorable';
 
-const ChartComponent = Ember.Component.extend(ColorableMixin, ResizeHandlerMixin, {
+export default Ember.Component.extend(ColorableMixin, ResizeHandlerMixin, {
   layoutName: 'components/chart-component',
   classNames: ['chart-frame', 'scroll-y'],
   isInteractive: true,
@@ -15,110 +15,8 @@ const ChartComponent = Ember.Component.extend(ColorableMixin, ResizeHandlerMixin
   horizontalMargin: 30,
   verticalMargin: 30,
 
-  /**
-   * Optional property to set specific left margin
-   * @type {Number}
-   */
-  horizontalMarginLeft: null,
-
-  /**
-   * Optional property to set specific right margin
-   * @type {Number}
-   */
-  horizontalMarginRight: null,
-
-  /**
-   * An array of the values in the data that is passed into the chart
-   * @type {Array.<Number>}
-   */
-  allFinishedDataValues: Ember.computed('finishedData.@each.value', function() {
-    return this.get('finishedData').map((d) => d.value);
-  }),
-
-  /**
-   * The minimum value of the data in the chart
-   * @type {Number}
-   */
-  minValue: Ember.computed('allFinishedDataValues.[]', function() {
-    return d3.min(this.get('allFinishedDataValues'));
-  }),
-
-  /**
-   * The maximum value of the data in the chart
-   * @type {Number}
-   */
-  maxValue: Ember.computed('allFinishedDataValues.[]', function() {
-    return d3.max(this.get('allFinishedDataValues'));
-  }),
-
-  /**
-   * An array of the values which are at least 0
-   * @type {Array<Number>}
-   */
-  positiveValues: Ember.computed('allFinishedDataValues.[]', function() {
-    return this.get('allFinishedDataValues').filter((val) => val >= 0);
-  }),
-
-  /**
-   * An array of the values which are less than 0
-   * @type {Array<Number>}
-   */
-  negativeValues: Ember.computed('allFinishedDataValues.[]', function() {
-    return this.get('allFinishedDataValues').filter((val) => val < 0);
-  }),
-
-  /**
-   * Whether or not the data contains negative values.
-   * @type {Boolean}
-   */
-  hasNegativeValues: Ember.computed.lt('minValue', 0),
-
-  /**
-   * Whether or not the data contains positive values.
-   * @type {Boolean}
-   */
-  hasPositiveValues: Ember.computed.gt('maxValue', 0),
-
-  /**
-   * Whether or not the data contains only positive values.
-   * @type {Boolean}
-   */
-  hasAllNegativeValues: Ember.computed.lte('maxValue', 0),
-
-  /**
-   * Whether or not the data contains only negative values.
-   * @type {Boolean}
-   */
-  hasAllPositiveValues: Ember.computed.gte('minValue', 0),
-
-  /**
-   * Either a passed in value from `horizontalMarginRight`
-   * or the default value from `horizontalMargin`
-   * @type {Number}
-   */
-  marginRight: Ember.computed('horizontalMarginRight', 'horizontalMargin', function(){
-    const horizontalMarginRight = this.get('horizontalMarginRight');
-    if (Ember.isNone(horizontalMarginRight)) {
-      return this.get('horizontalMargin');
-    } else {
-      return horizontalMarginRight;
-    }
-  }),
-
-  /**
-   * Either a passed in value from `horizontalMarginLeft`
-   * or the default value from `horizontalMargin`
-   * @type {Number}
-   */
-  marginLeft: Ember.computed('horizontalMarginLeft', 'horizontalMargin', function(){
-    const horizontalMarginLeft = this.get('horizontalMarginLeft');
-    if (Ember.isNone(horizontalMarginLeft)) {
-      return this.get('horizontalMargin');
-    } else {
-      return horizontalMarginLeft;
-    }
-  }),
-
+  marginRight: Ember.computed.alias('horizontalMargin'),
+  marginLeft: Ember.computed.alias('horizontalMargin'),
   marginTop: Ember.computed.alias('verticalMargin'),
   marginBottom: Ember.computed.alias('verticalMargin'),
 
@@ -150,9 +48,7 @@ const ChartComponent = Ember.Component.extend(ColorableMixin, ResizeHandlerMixin
 
   // Transform the view commonly displaced by the margin
   transformViewport: Ember.computed('marginLeft', 'marginTop', function() {
-    const left = this.get('marginLeft');
-    const top = this.get('marginTop');
-    return `translate(${left},${top})`;
+    return 'translate(' + this.get('marginLeft') + ',' + this.get('marginTop') + ')';
   }),
 
   // ----------------------------------------------------------------------------
@@ -213,13 +109,7 @@ const ChartComponent = Ember.Component.extend(ColorableMixin, ResizeHandlerMixin
   // Every chart will trigger a redraw when these variables change, through the
   // magic of concatenatedProperties any class that overrides the variable
   // renderVars will actually just be appending names to the list
-  renderVars: [
-    'finishedData',
-    'width',
-    'height',
-    'margin',
-    'isInteractive'
-  ],
+  renderVars: ['finishedData', 'width', 'height', 'margin', 'isInteractive'],
 
   init: function() {
     this._super();
@@ -275,5 +165,3 @@ const ChartComponent = Ember.Component.extend(ColorableMixin, ResizeHandlerMixin
     }
   }
 });
-
-export default ChartComponent;

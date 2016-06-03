@@ -5,12 +5,11 @@ import LegendMixin from '../mixins/legend';
 import FloatingTooltipMixin from '../mixins/floating-tooltip';
 import AxesMixin from '../mixins/axes';
 import NoMarginChartMixin from '../mixins/no-margin-chart';
-import AxisTitlesMixin from '../mixins/axis-titles';
 
 import { groupBy } from '../utils/group-by';
 
-const ScatterChartComponent = ChartComponent.extend(LegendMixin, FloatingTooltipMixin,
-  AxesMixin, NoMarginChartMixin, AxisTitlesMixin, {
+export default ChartComponent.extend(LegendMixin, FloatingTooltipMixin,
+  AxesMixin, NoMarginChartMixin, {
 
   classNames: ['chart-scatter'],
 
@@ -44,22 +43,6 @@ const ScatterChartComponent = ChartComponent.extend(LegendMixin, FloatingTooltip
   // NoMarginChartMixin makes right margin 0 but we need that room because the
   // last label of the axis is commonly too large
   marginRight: Ember.computed.alias('horizontalMargin'),
-
-  /**
-   * A flag to indicate if the chart view should have left & right margin based
-   * on maximum & minimum X values. If this is set to false, the left & right
-   * sides of the chart will not have extra padding column.
-   * @type {Boolean}
-  **/
-  hasXDomainPadding: true,
-
-  /**
-   * A flag to indicate if the chart view should have top & bottom margin based
-   * on maximum & minimum Y values. If this is set to false, the top & bottom
-   * sides of the chart will not have extra padding column.
-   * @type {Boolean}
-  **/
-  hasYDomainPadding: true,
 
   // ----------------------------------------------------------------------------
   // Data
@@ -106,6 +89,16 @@ const ScatterChartComponent = ChartComponent.extend(LegendMixin, FloatingTooltip
   // ----------------------------------------------------------------------------
   // Layout
   // ----------------------------------------------------------------------------
+  // TODO(tony): Consider making logic for whether we are showing the title or
+  // not and then axis mixin will calculate axis offset that will be added
+  axisTitleHeightOffset: Ember.computed('axisTitleHeight', 'labelPadding', function() {
+    return this.get('axisTitleHeight') + this.get('labelPadding');
+  }),
+
+  // TODO(tony): Just use axisBottomOffset here
+  legendChartPadding: Ember.computed('labelHeightOffset', 'axisTitleHeightOffset', function() {
+    return this.get('axisTitleHeightOffset') + this.get('labelHeightOffset');
+  }),
 
   // Chart Graphic Dimensions
   graphicTop: Ember.computed.alias('axisTitleHeight'),
@@ -118,6 +111,9 @@ const ScatterChartComponent = ChartComponent.extend(LegendMixin, FloatingTooltip
   graphicWidth: Ember.computed('width', 'labelWidthOffset', function() {
     return this.get('width') - this.get('labelWidthOffset');
   }),
+
+  // Height of the text for the axis titles
+  axisTitleHeight: 18,
 
   // ----------------------------------------------------------------------------
   // Ticks and Scales
@@ -161,10 +157,7 @@ const ScatterChartComponent = ChartComponent.extend(LegendMixin, FloatingTooltip
     var xDomain = this.get('xDomain');
     var graphicLeft = this.get('graphicLeft');
     var graphicWidth = this.get('graphicWidth');
-    var padding = 0;
-    if (this.get('hasXDomainPadding')) {
-      padding = (xDomain[1] - xDomain[0]) * this.get('graphPadding');
-    }
+    var padding = (xDomain[1] - xDomain[0]) * this.get('graphPadding');
 
     return d3.scale.linear()
             .domain([xDomain[0] - padding, xDomain[1] + padding]).range([graphicLeft, graphicLeft + graphicWidth])
@@ -176,10 +169,7 @@ const ScatterChartComponent = ChartComponent.extend(LegendMixin, FloatingTooltip
     var yDomain = this.get('yDomain');
     var graphicTop = this.get('graphicTop');
     var graphicHeight = this.get('graphicHeight');
-    var padding = 0;
-    if (this.get('hasYDomainPadding')) {
-      padding = (yDomain[1] - yDomain[0]) * this.get('graphPadding');
-    }
+    var padding = (yDomain[1] - yDomain[0]) * this.get('graphPadding');
 
     return d3.scale.linear().domain([yDomain[0] - padding, yDomain[1] + padding])
             .range([graphicTop + graphicHeight, graphicTop])
@@ -226,11 +216,6 @@ const ScatterChartComponent = ChartComponent.extend(LegendMixin, FloatingTooltip
 
   getGroupColor: Ember.computed(function() {
     return (d, i) => {
-      // If there is an overriding color assigned to the group, we use that
-      // color.
-      if (!Ember.isNone(d.color)) {
-        return d.color;
-      }
       var colorIndex = 0;
       if (this.get('displayGroups')) {
         i = this.get('groupNames').indexOf(d.group);
@@ -263,15 +248,11 @@ const ScatterChartComponent = ChartComponent.extend(LegendMixin, FloatingTooltip
     var legendData = this.get('groupedData').map(function(d, i) {
       var name = d[0].group;
       var value = d.length === 1 ? d[0] : null;
-      // Get the color of the group. Because they are in the same group, they
-      // should share the same color, so we only need to get the color of the
-      // first object and pass to the function
-      var color = getGroupColor(d[0], i);
       return {
         label: name,
         group: name,
-        stroke: color,
-        fill: displayGroups ? color : 'transparent',
+        stroke: getGroupColor,
+        fill: displayGroups ? getGroupColor : 'transparent',
         icon: getGroupShape,
         selector: ".group-" + i,
         xValue: value != null ? value.xValue : void 0,
@@ -375,6 +356,15 @@ const ScatterChartComponent = ChartComponent.extend(LegendMixin, FloatingTooltip
     }
   },
 
+  selectOrCreateAxisTitle: function(selector) {
+    var title = this.get('viewport').select(selector);
+    if (title.empty()) {
+      return this.get('viewport').append('text');
+    } else {
+      return title;
+    }
+  },
+
   xAxis: Ember.computed(function() {
     return this.selectOrCreateAxis('.x.axis').attr('class', 'x axis');
   }).volatile(),
@@ -383,30 +373,25 @@ const ScatterChartComponent = ChartComponent.extend(LegendMixin, FloatingTooltip
     return this.selectOrCreateAxis('.y.axis').attr('class', 'y axis');
   }).volatile(),
 
+  xAxisTitle: Ember.computed(function() {
+    return this.selectOrCreateAxisTitle('.x.axis-title').attr('class', 'x axis-title');
+  }).volatile(),
+
+  yAxisTitle: Ember.computed(function() {
+    return this.selectOrCreateAxisTitle('.y.axis-title').attr('class', 'y axis-title');
+  }).volatile(),
+
   // ----------------------------------------------------------------------------
   // Drawing Functions
   // ----------------------------------------------------------------------------
 
-  renderVars: [
-    'xScale',
-    'yScale',
-    'dotShapeArea',
-    'finishedData',
-    'xValueDisplayName',
-    'yValueDisplayName',
-    'hasAxisTitles', // backward compatibility support.
-    'hasXAxisTitle',
-    'hasYAxisTitle',
-    'xTitleHorizontalOffset',
-    'yTitleVerticalOffset'
-  ],
+  renderVars: ['xScale', 'yScale', 'dotShapeArea', 'finishedData', 'xValueDisplayName', 'yValueDisplayName'],
 
   drawChart: function() {
     this.updateTotalPointData();
     this.updateData();
     this.updateAxes();
     this.updateGraphic();
-    this.updateAxisTitles();
     if (this.get('hasLegend')) {
       return this.drawLegend();
     } else {
@@ -466,12 +451,8 @@ const ScatterChartComponent = ChartComponent.extend(LegendMixin, FloatingTooltip
   },
 
   updateAxes: function() {
-    var xAxis = d3.svg.axis().scale(this.get('xScale')).orient('top')
-        .ticks(this.get('numXTicks')).tickSize(this.get('graphicHeight'))
-        .tickFormat(this.get('formatXValue'));
-    var yAxis = d3.svg.axis().scale(this.get('yScale')).orient('right')
-        .ticks(this.get('numYTicks')).tickSize(this.get('graphicWidth'))
-        .tickFormat(this.get('formatYValue'));
+    var xAxis = d3.svg.axis().scale(this.get('xScale')).orient('top').ticks(this.get('numXTicks')).tickSize(this.get('graphicHeight')).tickFormat(this.get('formatXValue'));
+    var yAxis = d3.svg.axis().scale(this.get('yScale')).orient('right').ticks(this.get('numYTicks')).tickSize(this.get('graphicWidth')).tickFormat(this.get('formatYValue'));
     var graphicTop = this.get('graphicTop');
     var graphicHeight = this.get('graphicHeight');
     var gXAxis = this.get('xAxis')
@@ -500,6 +481,17 @@ const ScatterChartComponent = ChartComponent.extend(LegendMixin, FloatingTooltip
 
     gYAxis.selectAll('text').style('text-anchor', 'end').attr({
       x: -this.get('labelPadding')
+    });
+
+    var xAxisPadding = this.get('labelHeightOffset') + this.get('labelPadding');
+    this.get('xAxisTitle').text(this.get('xValueDisplayName')).style('text-anchor', 'middle').attr({
+      x: this.get('graphicWidth') / 2 + this.get('labelWidthOffset'),
+      y: this.get('graphicBottom') + xAxisPadding
+    });
+
+    return this.get('yAxisTitle').text(this.get('yValueDisplayName')).style('text-anchor', 'start').attr({
+      y: 0,
+      x: 0
     });
   },
 
@@ -530,5 +522,3 @@ const ScatterChartComponent = ChartComponent.extend(LegendMixin, FloatingTooltip
     });
   }
 });
-
-export default ScatterChartComponent;
